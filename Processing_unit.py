@@ -6,11 +6,8 @@ from datetime import datetime
 import time
 import os
 
-# -----------------------------
-# CONFIG: ThingSpeak info
-# -----------------------------
-CHANNEL_ID = '3123837'
-READ_API_KEY = 'MGBD4FBJ3PLVO5CP'
+CHANNEL_ID = # add yours, not needed tho
+READ_API_KEY = # add yours
 
 FIELDS = {
     "temperature": "field1",
@@ -26,30 +23,23 @@ FIELDS = {
 STRESS_LABELS = {0: "healthy", 1: "moderate", 2: "stressed"}
 RESULTS_FILE = 'results.csv'
 
-# -----------------------------
 # Load models and scalers
-# -----------------------------
 stress_model = joblib.load('stress_model.pkl')
 irrigation_model = joblib.load('irrigation_model.pkl')
 stress_scaler = joblib.load('stress_scaler.pkl')
 irrigation_scaler = joblib.load('irrigation_scaler.pkl')
 label_encoder = joblib.load('label_encoder.pkl')  # optional if needed
 
-# -----------------------------
 # OPTIMAL TARGETS for wheat
-# (Adjust units to your sensor setup!)
-# -----------------------------
-# From research: for wheat = ~ N @ 125 kg/ha, P2O5 @ 25 kg/ha, K2O @ 50 kg/ha. :contentReference[oaicite:0]{index=0}
+
 OPT_N = 13.0    # target Nitrogen
 OPT_P = 10.0     # target Phosphorus (as P2O5 equivalent)
 OPT_K = 8.0     # target Potassium (as K2O equivalent)
 
-# Light intensity target from indoor wheat experiments: study used 300/500/700/900 µmol/m²/s. :contentReference[oaicite:1]{index=1}
-OPT_LIGHT = 14000.0   # assume target light intensity in same units as your sensor (µmol/m²/s) – adjust if needed
+# Light intensity target 
+OPT_LIGHT = 14000.0   
 
-# -----------------------------
 # Fetch latest sensor data
-# -----------------------------
 def fetch_latest_data():
     url = f'https://api.thingspeak.com/channels/{CHANNEL_ID}/feeds.json?api_key={READ_API_KEY}&results=1'
     response = requests.get(url).json()
@@ -64,21 +54,16 @@ def fetch_latest_data():
     entry_id = latest_entry.get('entry_id', 0)
     return np.array(input_values).reshape(1, -1), timestamp, entry_id
 
-# -----------------------------
 # Preprocess using saved scalers
-# -----------------------------
 def preprocess_stress(data):
     df = pd.DataFrame(data, columns=stress_scaler.feature_names_in_)
     return stress_scaler.transform(df)
 
 def preprocess_irrigation(data):
-    # Assumes irrigation model uses first 5 features (temperature, humidity, soil_moisture, soil_temperature, light_intensity)
     df = pd.DataFrame(data[:, :5], columns=irrigation_scaler.feature_names_in_)
     return irrigation_scaler.transform(df)
 
-# -----------------------------
 # Heuristic functions for NPK & Light additions
-# -----------------------------
 def compute_npk_addition(current_N, current_P, current_K):
     """
     Returns the amounts to add (N_add, P_add, K_add) such that each meets or approaches its target.
@@ -91,17 +76,10 @@ def compute_npk_addition(current_N, current_P, current_K):
     return add_N, add_P, add_K
 
 def compute_light_addition(current_light):
-    """
-    Returns amount of light to add (or additional LED exposure time/intensity)
-    such that target is reached. If current >= target, addition = 0.
-    Adapt units and scaling as needed.
-    """
     add_light = max(0.0, OPT_LIGHT - current_light)
     return add_light
-
-# -----------------------------
+    
 # Predict stress & irrigation based on AI models
-# -----------------------------
 def predict(data):
     stress_X = preprocess_stress(data)
     irrigation_X = preprocess_irrigation(data)
@@ -112,9 +90,7 @@ def predict(data):
     stress_pred = STRESS_LABELS.get(stress_pred_encoded, "unknown")
     return stress_pred, irrigation_pred
 
-# -----------------------------
 # Save results
-# -----------------------------
 def save_results(timestamp, data, irrigation_pred, stress_pred, add_N, add_P, add_K, add_light):
     row = {
         'timestamp': timestamp,
@@ -139,9 +115,7 @@ def save_results(timestamp, data, irrigation_pred, stress_pred, add_N, add_P, ad
     else:
         df.to_csv(RESULTS_FILE, index=False)
 
-# -----------------------------
 # MAIN LOOP
-# -----------------------------
 if __name__ == "__main__":
     last_entry_id = None
 
@@ -180,3 +154,4 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error: {e}")
             time.sleep(15)
+
